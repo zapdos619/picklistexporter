@@ -311,8 +311,20 @@ class PicklistExporter:
             if response.status_code == 200:
                 for field in response.json().get('fields', []):
                     if field['name'].lower() == field_name.lower():
-                        return [PicklistValueDetail(label=pv.get('label', ''), value=pv.get('value', ''), is_active=pv.get('active', True))
-                                for pv in field.get('picklistValues', [])]
+                        results = []
+                        for pv in field.get('picklistValues', []):
+                            # CRITICAL FIX: Handle active field properly
+                            active_value = pv.get('active')
+                            # If 'active' key exists, use its boolean value
+                            # If 'active' key is missing, default to True
+                            is_active = True if active_value is None else bool(active_value)
+                            
+                            results.append(PicklistValueDetail(
+                                label=pv.get('label', ''), 
+                                value=pv.get('value', ''), 
+                                is_active=is_active
+                            ))
+                        return results
         except Exception as e:
             self._log_status(f"      ERROR queryRestDescribeForPicklist: {str(e)}")
         return []
@@ -324,8 +336,20 @@ class PicklistExporter:
             if not value_set: return results
             values = value_set.get('valueSetDefinition', {}).get('value', []) or value_set.get('value', [])
             for v in values:
-                is_active = bool(v.get('isActive', True))
-                results.append(PicklistValueDetail(label=v.get('label', ''), value=v.get('valueName') or v.get('value', ''), is_active=is_active))
+                # CRITICAL FIX: Handle isActive field properly
+                is_active_raw = v.get('isActive')
+                # If isActive is None (key missing), default to True
+                # If isActive exists, convert to boolean
+                if is_active_raw is None:
+                    is_active = True
+                else:
+                    is_active = bool(is_active_raw)
+                
+                results.append(PicklistValueDetail(
+                    label=v.get('label', ''), 
+                    value=v.get('valueName') or v.get('value', ''), 
+                    is_active=is_active
+                ))
         except Exception as e:
             self._log_status(f"      ERROR parseValueSet: {str(e)}")
         return results
@@ -554,19 +578,19 @@ class PicklistExportGUI(ctk.CTk):
     
     def _setup_export_frame(self):
         export_frame = self.export_frame
-        export_frame.grid_rowconfigure(2, weight=1)
+        export_frame.grid_rowconfigure(1, weight=1)  # Selection frame expands
         export_frame.grid_columnconfigure(0, weight=1)
         
         header_frame = ctk.CTkFrame(export_frame, fg_color="transparent")
-        header_frame.grid(row=0, column=0, pady=(10, 5), sticky="ew")
+        header_frame.grid(row=0, column=0, pady=(5, 5), sticky="ew")
         header_frame.columnconfigure(0, weight=1)
-        ctk.CTkLabel(header_frame, text="Object Selection & Export", font=ctk.CTkFont(size=30, weight="bold")).grid(row=0, column=0, sticky="w")
+        ctk.CTkLabel(header_frame, text="Object Selection & Export", font=ctk.CTkFont(size=24, weight="bold")).grid(row=0, column=0, sticky="w")
         
         self.logout_button = ctk.CTkButton(header_frame, text="Logout", command=self.logout_action, width=100, fg_color="#CC3333")
         self.logout_button.grid(row=0, column=1, sticky="e", padx=10)
 
         selection_frame = ctk.CTkFrame(export_frame)
-        selection_frame.grid(row=1, column=0, pady=10, sticky="nsew")
+        selection_frame.grid(row=1, column=0, pady=5, sticky="nsew")
         selection_frame.grid_columnconfigure(0, weight=3)
         selection_frame.grid_columnconfigure(1, weight=1)
         selection_frame.grid_columnconfigure(2, weight=2)
@@ -574,73 +598,76 @@ class PicklistExportGUI(ctk.CTk):
         
         # Available objects frame
         available_frame = ctk.CTkFrame(selection_frame)
-        available_frame.grid(row=0, column=0, padx=10, pady=10, sticky="nsew")
+        available_frame.grid(row=0, column=0, padx=5, pady=5, sticky="nsew")
         available_frame.grid_rowconfigure(2, weight=1)
         available_frame.grid_columnconfigure(0, weight=1)
         
-        ctk.CTkLabel(available_frame, text="Available Objects (Org)", font=ctk.CTkFont(size=18, weight="bold")).grid(row=0, column=0, pady=(5, 5))
+        ctk.CTkLabel(available_frame, text="Available Objects", font=ctk.CTkFont(size=16, weight="bold")).grid(row=0, column=0, pady=3)
         
-        self.search_entry = ctk.CTkEntry(available_frame, placeholder_text="Search Object API Name...", height=35)
-        self.search_entry.grid(row=1, column=0, padx=10, pady=5, sticky="ew")
+        self.search_entry = ctk.CTkEntry(available_frame, placeholder_text="Search...", height=30)
+        self.search_entry.grid(row=1, column=0, padx=8, pady=3, sticky="ew")
         
         # Debounced search
         self._search_after_id = None
         self.search_entry.bind("<KeyRelease>", self._debounced_search)
 
-        self.available_listbox = tk.Listbox(available_frame, selectmode="extended", height=15, exportselection=False,
-                                            font=("Arial", 12), borderwidth=0, highlightthickness=0,
+        self.available_listbox = tk.Listbox(available_frame, selectmode="extended", height=12, exportselection=False,
+                                            font=("Arial", 10), borderwidth=0, highlightthickness=0,
                                             selectbackground="#1F538D", fg="white", background="#242424")
-        self.available_listbox.grid(row=2, column=0, padx=10, pady=(0, 10), sticky="nsew")
+        self.available_listbox.grid(row=2, column=0, padx=8, pady=(0, 8), sticky="nsew")
 
         # Action buttons frame
         action_frame = ctk.CTkFrame(selection_frame, fg_color="transparent")
-        action_frame.grid(row=0, column=1, padx=5, pady=10, sticky="n")
+        action_frame.grid(row=0, column=1, padx=3, pady=5, sticky="n")
         
-        ctk.CTkLabel(action_frame, text="Actions", font=ctk.CTkFont(size=14, weight="bold")).pack(pady=5)
+        ctk.CTkLabel(action_frame, text="Actions", font=ctk.CTkFont(size=13, weight="bold")).pack(pady=3)
         
-        ctk.CTkButton(action_frame, text=">> Add >>", command=self.add_selected_to_export, height=35, width=120).pack(pady=5, padx=5, fill="x")
-        ctk.CTkButton(action_frame, text="<< Remove <<", command=self.remove_selected_from_export, height=35, width=120).pack(pady=5, padx=5, fill="x")
+        ctk.CTkButton(action_frame, text=">> Add >>", command=self.add_selected_to_export, height=30, width=100).pack(pady=3, padx=3, fill="x")
+        ctk.CTkButton(action_frame, text="<< Remove <<", command=self.remove_selected_from_export, height=30, width=100).pack(pady=3, padx=3, fill="x")
 
-        ctk.CTkButton(action_frame, text="Select All", command=self.select_all_available, height=35, width=120).pack(pady=(20, 5), padx=5, fill="x")
-        ctk.CTkButton(action_frame, text="Deselect All", command=self.deselect_all_available, height=35, width=120).pack(pady=5, padx=5, fill="x")
+        ctk.CTkButton(action_frame, text="Select All", command=self.select_all_available, height=30, width=100).pack(pady=(15, 3), padx=3, fill="x")
+        ctk.CTkButton(action_frame, text="Deselect All", command=self.deselect_all_available, height=30, width=100).pack(pady=3, padx=3, fill="x")
 
         # Selected objects frame
         selected_frame = ctk.CTkFrame(selection_frame)
-        selected_frame.grid(row=0, column=2, padx=10, pady=10, sticky="nsew")
+        selected_frame.grid(row=0, column=2, padx=5, pady=5, sticky="nsew")
         selected_frame.grid_rowconfigure(1, weight=1)
         selected_frame.grid_columnconfigure(0, weight=1)
         
         header_container = ctk.CTkFrame(selected_frame, fg_color="transparent")
-        header_container.grid(row=0, column=0, pady=(5, 5), sticky="ew")
+        header_container.grid(row=0, column=0, pady=3, sticky="ew")
         header_container.columnconfigure(0, weight=1)
         
-        ctk.CTkLabel(header_container, text="Selected for Export", font=ctk.CTkFont(size=18, weight="bold")).grid(row=0, column=0, sticky="w", padx=10)
+        ctk.CTkLabel(header_container, text="Selected for Export", font=ctk.CTkFont(size=16, weight="bold")).grid(row=0, column=0, sticky="w", padx=8)
         
-        self.selected_count_label = ctk.CTkLabel(header_container, text="(0)", font=ctk.CTkFont(size=14))
-        self.selected_count_label.grid(row=0, column=1, sticky="e", padx=10)
+        self.selected_count_label = ctk.CTkLabel(header_container, text="(0)", font=ctk.CTkFont(size=13))
+        self.selected_count_label.grid(row=0, column=1, sticky="e", padx=8)
         
-        self.selected_listbox = tk.Listbox(selected_frame, selectmode="extended", height=15, exportselection=False,
-                                           font=("Arial", 12), borderwidth=0, highlightthickness=0,
+        self.selected_listbox = tk.Listbox(selected_frame, selectmode="extended", height=12, exportselection=False,
+                                           font=("Arial", 10), borderwidth=0, highlightthickness=0,
                                            selectbackground="#3366CC", fg="white", background="#242424")
-        self.selected_listbox.grid(row=1, column=0, padx=10, pady=(0, 10), sticky="nsew")
+        self.selected_listbox.grid(row=1, column=0, padx=8, pady=(0, 8), sticky="nsew")
 
-        # Status textbox
-        self.status_textbox = ctk.CTkTextbox(export_frame, height=150)
-        self.status_textbox.grid(row=2, column=0, padx=20, pady=(10, 10), sticky="ew")
+        # Status textbox - FIXED HEIGHT
+        status_label = ctk.CTkLabel(export_frame, text="Export Status:", font=ctk.CTkFont(size=14, weight="bold"), anchor="w")
+        status_label.grid(row=2, column=0, padx=20, pady=(5, 0), sticky="w")
+        
+        self.status_textbox = ctk.CTkTextbox(export_frame, height=120)
+        self.status_textbox.grid(row=3, column=0, padx=20, pady=(0, 5), sticky="ew")
         self.status_textbox.insert("end", "Status: Ready to select objects and export.")
         self.status_textbox.configure(state="disabled")
 
         # Export button frame with cancel button
         button_frame = ctk.CTkFrame(export_frame, fg_color="transparent")
-        button_frame.grid(row=3, column=0, pady=(10, 20), sticky="ew", padx=20)
+        button_frame.grid(row=4, column=0, pady=(5, 10), sticky="ew", padx=20)
         button_frame.columnconfigure(0, weight=1)
         
         self.export_button = ctk.CTkButton(button_frame, text="Export Picklist Data", command=self.export_action, 
-                                          height=50, fg_color="green", font=ctk.CTkFont(size=16, weight="bold"))
+                                          height=45, fg_color="green", font=ctk.CTkFont(size=15, weight="bold"))
         self.export_button.grid(row=0, column=0, sticky="ew", padx=(0, 10))
         
         self.cancel_button = ctk.CTkButton(button_frame, text="Cancel Export", command=self.cancel_export_action,
-                                          height=50, fg_color="#CC3333", font=ctk.CTkFont(size=16, weight="bold"), width=150)
+                                          height=45, fg_color="#CC3333", font=ctk.CTkFont(size=15, weight="bold"), width=150)
         self.cancel_button.grid(row=0, column=1, sticky="e")
         self.cancel_button.grid_remove()  # Hide initially
     
@@ -745,7 +772,7 @@ class PicklistExportGUI(ctk.CTk):
     # --- Action Methods ---
 
     def logout_action(self):
-        """Logout with confirmation"""
+        """Logout with confirmation - PRESERVES INPUT FIELDS"""
         if self.is_exporting:
             messagebox.showwarning("Export In Progress", "Cannot logout while export is running. Please wait or cancel the export.")
             return
@@ -759,10 +786,10 @@ class PicklistExportGUI(ctk.CTk):
             # Reset login button
             self.login_button.configure(state="normal", text="Login to Salesforce")
             
-            # Clear credentials
-            self.username_entry.delete(0, END)
-            self.password_entry.delete(0, END)
-            self.token_entry.delete(0, END)
+            # DO NOT clear credentials - keep them for re-login
+            # self.username_entry.delete(0, END)  # REMOVED
+            # self.password_entry.delete(0, END)  # REMOVED
+            # self.token_entry.delete(0, END)     # REMOVED
             
             self.update_status("Logged out successfully. Please log in again.")
             
@@ -897,4 +924,3 @@ if __name__ == "__main__":
         import traceback
         traceback.print_exc()
         sys.exit(1)
-        
