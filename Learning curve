@@ -1,0 +1,28 @@
+html
+css
+
+1. planning how a website is build of how many section might come how that part is build.
+2. divide the things that we need to create that particular section.
+3. first do section 4. then its internal div upon content separaization
+
+so currnetly this does a single task whihc is getting picklist values and there apis this the main taks for now. but for now i want to expand this project. to other things liek adding dependency analysis, metatadta exporter and other formula fields extractor and so on in futre.
+the ui will follow in this step
+login(same as now and also keep other core funtinality)-->a big ui containting everthing button and object selector section like right now selecet deselect option and must show all the objects liek right now-->and after the selection of object user presees any of the buttons showed below the selection-deselection panel like the tasks i would like to add in future those option for now just keep the current fuction button--> the logout button should be in the uppoer right corener liek the place it is currently at-->the below terminal that is showing the progress should be a bit big currently it is a bit small from both side and in hight so make it a bit bigger.
+
+---
+
+| |
+| title logoutbutton |
+
+---
+
+| | | |
+| | | |
+| available objects |buttons| selected objects |
+| 40percent | 20% | 40% |
+| | | |
+| | | |
+| | | |
+| | | |
+| | | |
+| | | |

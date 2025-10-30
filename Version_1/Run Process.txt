@@ -1,0 +1,18 @@
+
+/*
+create the two classes "PicklistExportBatch" and "PicklistExportHelper" in developer console and paste the codes in the classes. 
+save the codes. 
+Open Anonymous window
+add the below code. 
+and execute
+*/
+
+List<String> objects = new List<String>{
+    'Contract',
+        'Case',
+    'Opportunity', 
+    'Lead'
+    // API name of objects
+    };
+PicklistExportBatch batch = new PicklistExportBatch(objects);
+Database.executeBatch(batch, 1);
